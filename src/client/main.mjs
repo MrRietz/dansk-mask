@@ -4,8 +4,12 @@ import { WEAPONS, WEAPON_ORDER } from '../core/weapons.mjs';
 import { Renderer } from './renderer.mjs';
 import { Input } from './input.mjs';
 import { Audio } from './audio.mjs';
+import { LAYOUTS } from '../core/maps.mjs';
+import { THEMES, themeById } from './themes.mjs';
 
 const $ = (id) => document.getElementById(id);
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+document.body.classList.toggle('touch', isTouch);
 const canvas = $('game');
 const audio = new Audio();
 const renderer = new Renderer(canvas, audio);
@@ -85,11 +89,18 @@ function startGame(form) {
   app.game = new Game({
     seed,
     teams,
-    settings: { wormsPerTeam: Number(f.get('worms')), turnTime: Number(f.get('turn')) },
+    settings: { wormsPerTeam: Number(f.get('worms')), turnTime: Number(f.get('turn')), layout: String(f.get('layout')) },
   });
   app.humanTeam = 0;
   app.paused = false;
-  renderer.setGame(app.game);
+  const themeId = String(f.get('theme'));
+  const theme = themeById(themeId === 'random' ? THEMES[Math.floor(Math.random() * THEMES.length)].id : themeId);
+  renderer.setGame(app.game, theme);
+  if (isTouch) {
+    $('touch').classList.remove('hidden');
+    // The game HUD is identical on every device; the d-pad just sits above the team health bars.
+    document.documentElement.style.setProperty('--bars', `${teams.length * 26 + 18}px`);
+  }
   document.activeElement?.blur(); // a focused menu control would otherwise swallow game keys
   $('weaponBtn').classList.remove('hidden');
   $('menu').classList.add('hidden');
@@ -105,6 +116,10 @@ $('setup').addEventListener('submit', (e) => {
   startGame(e.target);
 });
 $('setup').elements.seed.value = Math.floor(Math.random() * 999999) + 1;
+for (const [name, list] of [['layout', LAYOUTS], ['theme', THEMES]]) {
+  for (const o of list) $('setup').elements[name].add(new Option(o.name, o.id));
+}
+$('pause').addEventListener('click', () => app.togglePause()); // the overlay covers the touch buttons
 $('weaponBtn').addEventListener('click', (e) => {
   e.currentTarget.blur();
   app.toggleWeapons();
@@ -113,10 +128,23 @@ $('again').addEventListener('click', () => {
   app.game = null;
   $('weaponBtn').classList.add('hidden');
   $('help').classList.add('hidden');
+  $('touch').classList.add('hidden');
   $('over').classList.add('hidden');
   $('menu').classList.remove('hidden');
   $('setup').elements.seed.value = Math.floor(Math.random() * 999999) + 1;
 });
+
+// Context buttons (fuse, rotate, bounce, switch worm) only show when the selected weapon uses them.
+const ctxButtons = [...document.querySelectorAll('#touch [data-ctx]')];
+function updateTouch(g) {
+  const mine = input.myTurn() && !g.turn.fired;
+  const wd = WEAPONS[g.turn.weapon];
+  for (const b of ctxButtons) {
+    const on = mine && (b.dataset.ctx === 'fuse' ? wd.fuse : b.dataset.ctx === 'canSwitch' ? g.turn.canSwitch : wd[b.dataset.ctx]);
+    b.classList.toggle('hidden', !on);
+  }
+  $('fuseN').textContent = g.turn.fuse;
+}
 
 let last = performance.now();
 let acc = 0;
@@ -144,6 +172,7 @@ function frame(now) {
       }
     }
     $('help').classList.toggle('hidden', !(input.myTurn() && !g.turn.fired));
+    if (isTouch) updateTouch(g);
     renderer.draw(app.paused ? 0 : dt, input);
     if (g.phase === 'over' && !overShown) {
       overShown = true;

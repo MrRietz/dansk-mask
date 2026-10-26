@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#0b1c2e">
   <title>Dansk Mask</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%AA%B1%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="style.css">
@@ -23,6 +25,32 @@
     <span><kbd>Right-click</kbd> panel</span>
   </div>
 
+  <!-- Touch controls: shown only on touch devices, wired up in input.mjs (each button sends a key). -->
+  <div id="touch" class="hidden">
+    <div class="tbar">
+      <button data-key="p" aria-label="Pause">⏸</button>
+      <button data-key="m" aria-label="Mute">🔊</button>
+      <button data-key="n" aria-label="Music">🎵</button>
+    </div>
+    <div class="tpad tleft">
+      <button data-key="ArrowLeft" data-hold aria-label="Walk left">◀</button>
+      <button data-key="ArrowRight" data-hold aria-label="Walk right">▶</button>
+      <button data-key="ArrowUp" data-hold aria-label="Aim up">▲</button>
+      <button data-key="ArrowDown" data-hold aria-label="Aim down">▼</button>
+    </div>
+    <div class="tctx">
+      <button data-ctx="fuse" class="hidden" aria-label="Fuse">⏱ <span id="fuseN">3</span></button>
+      <button data-key="r" data-ctx="rotates" class="hidden" aria-label="Rotate">⟳</button>
+      <button data-key="b" data-ctx="bounceable" class="hidden" aria-label="Bounce">↯</button>
+      <button data-key="Tab" data-ctx="canSwitch" class="hidden" aria-label="Switch worm">🔀</button>
+    </div>
+    <div class="tpad tright">
+      <button data-key="Backspace" aria-label="High jump">⤒</button>
+      <button data-key="Enter" aria-label="Jump">⤴</button>
+      <button data-key=" " data-hold class="fire" aria-label="Fire">FIRE</button>
+    </div>
+  </div>
+
   <div id="menu" class="overlay">
     <div class="card">
       <h1>DANSK MASK</h1>
@@ -40,6 +68,12 @@
         </label>
         <label>Turn time
           <select name="turn"><option>30</option><option>45</option><option selected>60</option><option>90</option></select>
+        </label>
+        <label>Map
+          <select name="layout"><option value="random">Random</option></select>
+        </label>
+        <label>Theme
+          <select name="theme"><option value="random">Random</option></select>
         </label>
         <label>Map seed <input name="seed" type="number" min="1" max="999999"></label>
         <button type="submit" class="primary">Start game</button>
@@ -60,13 +94,14 @@
           <tr><td>Tab</td><td>Switch worm (Select Worm)</td></tr>
           <tr><td>Home</td><td>Centre camera on worm</td></tr>
           <tr><td>Mouse at edge / wheel</td><td>Scroll / zoom</td></tr>
-          <tr><td>P / M</td><td>Pause / mute</td></tr>
+          <tr><td>P / M / N</td><td>Pause / mute all / music on-off</td></tr>
+          <tr><td>Touch</td><td>On-screen buttons: ◀ ▶ walk, ▲ ▼ aim, ⤴ jump, ⤒ high jump, hold FIRE then release</td></tr>
         </table>
       </details>
     </div>
   </div>
 
-  <div id="pause" class="overlay hidden"><div class="card"><h1>Paused</h1><p>Press P to continue</p></div></div>
+  <div id="pause" class="overlay hidden"><div class="card"><h1>Paused</h1><p>Press P (or ⏸) to continue</p></div></div>
 
   <div id="over" class="overlay hidden">
     <div class="card"><h1 id="overTitle"></h1><button id="again" class="primary">Back to menu</button></div>

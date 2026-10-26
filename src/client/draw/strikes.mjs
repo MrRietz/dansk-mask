@@ -279,6 +279,7 @@ registerDrawer('nukewater', (ctx, o) => {
 registerFx('strike', (e, r) => {
   r.say(`${e.name} inbound!`, '#ff8b3d', 1.8);
   r.audio.play('fire');
+  if (Number.isFinite(e.x)) r.focusStrike(e.x);
 });
 
 registerFx('flash', (e, r) => {

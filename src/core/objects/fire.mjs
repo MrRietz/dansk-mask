@@ -4,6 +4,10 @@ import { registerObjectType } from '../registry.mjs';
 import { moveBody } from '../physics.mjs';
 import { GRAVITY, DT } from '../constants.mjs';
 
+const FLAME_PUSH = 75; // px/s sideways away from the flame
+const FLAME_HOP = 170; // px/s upwards (a ~28 px hop)
+const FLAME_CALM = 130; // px/s: a worm moving faster than this is not hopped again
+
 registerObjectType('flame', {
   update(g, o) {
     o.life -= DT;
@@ -17,7 +21,15 @@ registerObjectType('flame', {
     if (o.burn <= 0) {
       o.burn = 0.25;
       for (const w of g.worms) {
-        if (w.alive && (w.x - o.x) ** 2 + (w.y - o.y) ** 2 < (w.r + o.r + 2) ** 2) g.hurt(w, o.dmg, o.owner);
+        if (!w.alive || (w.x - o.x) ** 2 + (w.y - o.y) ** 2 >= (w.r + o.r + 2) ** 2) continue;
+        // A burning worm hops away from the flame. Only when it is not already flying, so a pool of flames
+        // does not keep re-launching it, and never a frozen one.
+        if (!w.frozen && Math.hypot(w.vx, w.vy) < FLAME_CALM) {
+          w.vx += (w.x >= o.x ? 1 : -1) * FLAME_PUSH;
+          w.vy = Math.min(w.vy, -FLAME_HOP);
+          g.knock(w);
+        }
+        g.hurt(w, o.dmg, o.owner);
       }
     }
   },

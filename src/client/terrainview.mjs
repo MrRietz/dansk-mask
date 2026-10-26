@@ -1,5 +1,7 @@
 // Builds and maintains the visible terrain bitmap from the core's mask.
 // Later destruction arrives as 'carve' / 'fill' events and is applied to the canvas only.
+import { themeById } from './themes.mjs';
+
 function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) | 0;
   h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -8,8 +10,10 @@ function hash(x, y) {
 
 const pack = (r, g, b) => (255 << 24) | (Math.max(0, Math.min(255, b)) << 16) | (Math.max(0, Math.min(255, g)) << 8) | Math.max(0, Math.min(255, r));
 
-export function buildTerrainCanvas(terrain) {
+export function buildTerrainCanvas(terrain, theme = themeById('meadow')) {
   const { w, h, mask } = terrain;
+  const T = theme.terrain;
+  const [dTop, dMid, dDirt] = T.depths;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
@@ -27,26 +31,20 @@ export function buildTerrainCanvas(terrain) {
       }
       const n = hash(x >> 1, y >> 1) * 22 - 11;
       const band = Math.sin(y * 0.09 + Math.sin(x * 0.013) * 3) * 6;
-      let r;
-      let g;
-      let b;
-      if (depth < 4) {
-        r = 70 + n; g = 160 + n * 1.2; b = 55 + n; // grass
-      } else if (depth < 9) {
-        r = 90 + n; g = 110 + n; b = 50 + n; // grass-to-dirt
-      } else if (depth < 120) {
-        r = 128 + n + band; g = 88 + n + band * 0.7; b = 56 + n; // dirt
-      } else {
-        r = 100 + n + band; g = 80 + n; b = 68 + n; // rock
-      }
+      // top layer -> top-to-dirt -> dirt -> rock, by depth below the surface (band gain is 0 for the thin top layers)
+      const L = depth < dTop ? T.top : depth < dMid ? T.mid : depth < dDirt ? T.dirt : T.rock;
+      let r = L.c[0] + n * L.n[0] + band * L.b[0];
+      let g = L.c[1] + n * L.n[1] + band * L.b[1];
+      let b = L.c[2] + n * L.n[2] + band * L.b[2];
       const edge = !solid(x, y - 1) || !solid(x, y + 1) || !solid(x - 1, y) || !solid(x + 1, y);
       if (edge) {
         const down = !solid(x, y + 1);
-        r *= down ? 0.45 : 0.55;
-        g *= down ? 0.45 : 0.55;
-        b *= down ? 0.45 : 0.55;
-        if (!down && depth < 4) {
-          r = 40; g = 100; b = 35;
+        const k = down ? T.edgeShade[0] : T.edgeShade[1];
+        r *= k;
+        g *= k;
+        b *= k;
+        if (!down && depth < dTop) {
+          r = T.edgeTop[0]; g = T.edgeTop[1]; b = T.edgeTop[2];
         }
       }
       px[y * w + x] = pack(r, g, b);
@@ -58,10 +56,10 @@ export function buildTerrainCanvas(terrain) {
 }
 
 // Blast crater with a scorched rim.
-export function carve(canvas, x, y, r) {
+export function carve(canvas, x, y, r, theme) {
   const ctx = canvas.getContext('2d');
   ctx.globalCompositeOperation = 'source-atop';
-  ctx.fillStyle = 'rgba(30,18,8,0.9)';
+  ctx.fillStyle = theme ? theme.scorch : 'rgba(30,18,8,0.9)';
   ctx.beginPath();
   ctx.arc(x, y, r + 3, 0, Math.PI * 2);
   ctx.fill();

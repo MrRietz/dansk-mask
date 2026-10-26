@@ -4,6 +4,10 @@ import { WEAPONS } from '../core/weapons.mjs';
 import { CHARGE_TIME } from '../core/constants.mjs';
 import { DRAWERS, HELD, FX } from './draw/registry.mjs';
 import './draw/packs.mjs';
+import { themeById } from './themes.mjs';
+
+const AMBIENT_MAX = 110;
+const SPRINKLES = ['#ff5fa2', '#ffd23f', '#5fe3c0', '#6fa8ff', '#ffffff', '#b78cff'];
 
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -23,6 +27,9 @@ export class Renderer {
     this.shown = new Map(); // worm id -> displayed hp
     this.clouds = Array.from({ length: 12 }, () => ({ x: rand(0, 3000), y: rand(20, 260), s: rand(0.6, 1.6), v: rand(4, 12) }));
     this.t = 0;
+    this.theme = themeById('meadow');
+    this.stars = [];
+    this.ambient = []; // theme ambient particles (snow, embers, ...), kept apart from this.particles
     window.addEventListener('resize', () => this.resize());
     this.resize();
   }
@@ -42,9 +49,14 @@ export class Renderer {
     return g ? Math.max(this.vw / (g.terrain.w + 300), this.vh / (g.terrain.h + 200)) : 0.3;
   }
 
-  setGame(game) {
+  setGame(game, theme) {
     this.game = game;
-    this.terrainCanvas = buildTerrainCanvas(game.terrain);
+    this.theme = theme || themeById('meadow');
+    this.sky = null; // gradient is cached per theme
+    this.stars = this.theme.sky.stars ? Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random(), s: rand(0.6, 1.8), ph: rand(0, 6.3), sp: rand(1.5, 4) })) : [];
+    this.ambient = [];
+    this.ambientSeeded = false;
+    this.terrainCanvas = buildTerrainCanvas(game.terrain, this.theme);
     this.particles = [];
     this.shown.clear();
     for (const w of game.worms) this.shown.set(w.id, w.hp);
@@ -74,7 +86,7 @@ export class Renderer {
     const g = this.game;
     for (const e of events) {
       switch (e.type) {
-        case 'carve': carve(this.terrainCanvas, e.x, e.y, e.r); break;
+        case 'carve': carve(this.terrainCanvas, e.x, e.y, e.r, this.theme); break;
         case 'fill': drawGirder(this.terrainCanvas, e.x1, e.y1, e.x2, e.y2, e.th); break;
         case 'explosion': this.explosionFx(e); break;
         case 'splash': this.splashFx(e.x, e.y, e.size); this.audio.play('splash'); break;
@@ -133,7 +145,7 @@ export class Renderer {
           this.particles.push({ type: 'tracer', x: e.x1, y: e.y1, x2: e.x2, y2: e.y2, life: 0.12, max: 0.12, color: '#d9c79a' });
           break;
         case 'mineTrigger': this.audio.play('tick'); break;
-        case 'airstrike': this.say('Air strike inbound!', '#ff8b3d', 1.8); break;
+        case 'airstrike': this.say('Air strike inbound!', '#ff8b3d', 1.8); this.focusStrike(e.x); break;
         case 'suddenDeath': this.say('SUDDEN DEATH — water is rising', '#ff4d4d', 4); break;
         default: FX[e.type]?.(e, this); break;
         case 'surrender': this.say(`${g.teams[e.team].name} surrendered`, g.teams[e.team].color); break;
@@ -165,7 +177,7 @@ export class Renderer {
 
   splashFx(x, y, size = 1) {
     for (let i = 0; i < 14 * size; i++) {
-      this.particles.push({ type: 'drop', x: x + rand(-8, 8), y, vx: rand(-50, 50), vy: rand(-260, -80) * size, life: 1.2, max: 1.2 });
+      this.particles.push({ type: 'drop', x: x + rand(-8, 8), y, vx: rand(-50, 50), vy: rand(-260, -80) * size, life: 1.2, max: 1.2, color: this.theme.water.drop });
     }
   }
 
@@ -184,6 +196,14 @@ export class Renderer {
   }
 
   // ---------- camera ----------
+  // Air strikes, napalm and the like: look at the spot that was aimed at while the planes come in.
+  focusStrike(x) {
+    const g = this.game;
+    const s = g.terrain.surfaceY(Math.round(x), 0);
+    this.manualUntil = 0; // a manual scroll must not keep the camera away from the target
+    this.focus = { x, y: (s > 0 ? s : g.activeWorm().y) - 80, until: this.t + 4.5 };
+  }
+
   updateCamera(dt, mouse) {
     const g = this.game;
     const cam = this.cam;
@@ -259,7 +279,7 @@ export class Renderer {
     const bottom = cam.y + this.vh / (2 * cam.zoom);
 
     // water behind the land
-    ctx.fillStyle = '#18527f';
+    ctx.fillStyle = this.theme.water.fill;
     ctx.fillRect(left, g.waterY - 4, right - left, bottom - g.waterY + 40);
 
     const tw = g.terrain.w;
@@ -276,6 +296,8 @@ export class Renderer {
     for (const w of g.worms) if (w.alive) this.drawWorm(ctx, w);
     this.drawAim(ctx, input);
     this.drawParticles(ctx);
+    this.updateAmbient(dt, left, right, top, bottom);
+    this.drawAmbient(ctx);
     this.drawWater(ctx, left, right, bottom);
     this.drawLabels(ctx);
 
@@ -285,28 +307,31 @@ export class Renderer {
 
   drawSky(ctx) {
     const { vw, vh } = this;
+    const sky = this.theme.sky;
     if (!this.sky) {
       this.sky = ctx.createLinearGradient(0, 0, 0, vh);
-      this.sky.addColorStop(0, '#2a6db0');
-      this.sky.addColorStop(0.6, '#79b8e6');
-      this.sky.addColorStop(1, '#cfe9f7');
+      for (const [o, c] of sky.stops) this.sky.addColorStop(o, c);
     }
     ctx.fillStyle = this.sky;
     ctx.fillRect(0, 0, vw, vh);
     const camX = this.cam.x * this.cam.zoom;
     const camY = this.cam.y * this.cam.zoom;
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    for (const c of this.clouds) {
-      const x = ((c.x + this.t * c.v - camX * 0.15) % (vw + 400)) - 200;
-      const y = c.y - camY * 0.05;
-      for (const [dx, dy, rx, ry] of [[0, 0, 50, 16], [30, -8, 34, 14], [-28, -4, 30, 12]]) {
-        ctx.beginPath();
-        ctx.ellipse(x + dx * c.s, y + dy * c.s, rx * c.s, ry * c.s, 0, 0, Math.PI * 2);
-        ctx.fill();
+    if (this.stars.length) this.drawStars(ctx, camX, camY);
+    if (sky.planet) this.drawPlanet(ctx, sky.planet, camX, camY);
+    if (sky.clouds) {
+      ctx.fillStyle = sky.clouds;
+      for (const c of this.clouds) {
+        const x = ((c.x + this.t * c.v - camX * 0.15) % (vw + 400)) - 200;
+        const y = c.y - camY * 0.05;
+        for (const [dx, dy, rx, ry] of [[0, 0, 50, 16], [30, -8, 34, 14], [-28, -4, 30, 12]]) {
+          ctx.beginPath();
+          ctx.ellipse(x + dx * c.s, y + dy * c.s, rx * c.s, ry * c.s, 0, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
-    for (const [f, col, base, amp] of [[0.25, '#5d8fb8', 0.62, 70], [0.4, '#4a7aa1', 0.72, 55]]) {
-      ctx.fillStyle = col;
+    for (const { f, color, base, amp } of sky.mountains) {
+      ctx.fillStyle = color;
       ctx.beginPath();
       ctx.moveTo(0, vh);
       for (let x = 0; x <= vw; x += 12) {
@@ -319,9 +344,142 @@ export class Renderer {
     }
   }
 
+  drawStars(ctx, camX, camY) {
+    const { vw, vh } = this;
+    ctx.fillStyle = '#fff';
+    for (const s of this.stars) {
+      const x = (((s.x * vw - camX * 0.02) % vw) + vw) % vw;
+      const y = s.y * vh * 0.85 - camY * 0.01;
+      ctx.globalAlpha = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(this.t * s.sp + s.ph));
+      ctx.fillRect(x, y, s.s, s.s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  // A big planet (Earth) in the background; position and radius are viewport fractions.
+  drawPlanet(ctx, p, camX, camY) {
+    const { vw, vh } = this;
+    const R = p.r * Math.min(vw, vh);
+    const cx = p.x * vw - camX * 0.02;
+    const cy = p.y * vh - camY * 0.01;
+    const glow = ctx.createRadialGradient(cx, cy, R * 0.95, cx, cy, R * 1.3);
+    glow.addColorStop(0, p.glow);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.fillStyle = p.ocean;
+    ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    ctx.fillStyle = p.land;
+    for (const [dx, dy, rx, ry, rot] of [[-0.35, -0.25, 0.4, 0.22, 0.5], [0.3, 0.1, 0.3, 0.45, -0.3], [-0.15, 0.55, 0.3, 0.14, 0.2], [0.55, -0.45, 0.18, 0.1, 0]]) {
+      ctx.beginPath();
+      ctx.ellipse(cx + dx * R, cy + dy * R, rx * R, ry * R, rot, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.strokeStyle = p.cloud;
+    ctx.lineWidth = Math.max(2, R * 0.05);
+    ctx.lineCap = 'round';
+    for (const [dx, dy, len] of [[-0.5, 0.05, 0.5], [0.0, -0.45, 0.6], [0.1, 0.35, 0.45]]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + dx * R, cy + dy * R);
+      ctx.lineTo(cx + (dx + len) * R, cy + (dy - 0.06) * R);
+      ctx.stroke();
+    }
+    const shade = ctx.createRadialGradient(cx - R * 0.4, cy - R * 0.4, R * 0.25, cx, cy, R * 1.1);
+    shade.addColorStop(0, 'rgba(0,0,0,0)');
+    shade.addColorStop(1, p.shade);
+    ctx.globalAlpha = 0.8;
+    ctx.fillStyle = shade;
+    ctx.fillRect(cx - R, cy - R, R * 2, R * 2);
+    ctx.restore();
+  }
+
+  // ---------- theme ambient particles (max AMBIENT_MAX, world coordinates) ----------
+  updateAmbient(dt, left, right, top, bottom) {
+    const kind = this.theme.ambient;
+    if (!kind || kind === 'none') return;
+    for (const p of this.ambient) {
+      p.x += (p.vx + (kind === 'snow' ? Math.sin(this.t * 1.4 + p.ph) * 10 : 0)) * dt;
+      p.y += p.vy * dt;
+      if (p.max) p.life -= dt;
+      if (p.rot !== undefined) p.rot += p.vr * dt;
+    }
+    this.ambient = this.ambient.filter((p) => (!p.max || p.life > 0) && p.x > left - 80 && p.x < right + 80 && p.y < bottom + 20 && p.y > top - 40);
+    const fresh = !this.ambientSeeded; // first frame: scatter over the whole view instead of a strip at the top
+    this.ambientSeeded = true;
+    const n = fresh ? AMBIENT_MAX : 3;
+    for (let i = 0; i < n && this.ambient.length < AMBIENT_MAX; i++) this.ambient.push(this.spawnAmbient(kind, fresh, left, right, top, bottom));
+  }
+
+  spawnAmbient(kind, scatter, left, right, top, bottom) {
+    const x = rand(left - 40, right + 40);
+    const ph = rand(0, 6.3);
+    const y0 = scatter ? rand(top, bottom) : null;
+    switch (kind) {
+      case 'snow':
+        return { x, y: y0 ?? top - 6, vx: rand(-8, 8), vy: rand(25, 60), s: rand(1, 2.4), ph };
+      case 'embers': { // rise from the lava surface
+        const life = rand(2, 4.5);
+        const base = clamp(this.game.waterY, top, bottom);
+        return { x: clamp(x, left, right), y: y0 ?? base - rand(0, 15), vx: rand(-10, 10), vy: -rand(25, 70), s: rand(1, 2.2), ph, life, max: life };
+      }
+      case 'sprinkles':
+        return { x, y: y0 ?? top - 6, vx: rand(-10, 10), vy: rand(30, 70), s: rand(3, 5), ph, rot: rand(0, 6.3), vr: rand(-3, 3), color: SPRINKLES[Math.floor(Math.random() * SPRINKLES.length)] };
+      default: { // glitter
+        const life = rand(1, 2.6);
+        return { x: clamp(x, left, right), y: y0 ?? rand(top, bottom), vx: 0, vy: 0, s: rand(1.5, 3), ph, life: scatter ? rand(0.1, life) : life, max: life };
+      }
+    }
+  }
+
+  drawAmbient(ctx) {
+    const kind = this.theme.ambient;
+    if (!this.ambient.length) return;
+    if (kind === 'snow') {
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      for (const p of this.ambient) ctx.fillRect(p.x, p.y, p.s, p.s);
+    } else if (kind === 'embers') {
+      for (const p of this.ambient) {
+        const a = clamp(p.life / p.max, 0, 1);
+        ctx.fillStyle = `rgba(255,${Math.floor(90 + a * 120)},30,${a})`;
+        ctx.fillRect(p.x, p.y, p.s, p.s);
+      }
+    } else if (kind === 'sprinkles') {
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 1.6;
+      for (const p of this.ambient) {
+        ctx.strokeStyle = p.color;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x + Math.cos(p.rot) * p.s, p.y + Math.sin(p.rot) * p.s);
+        ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle = '#fff';
+      for (const p of this.ambient) {
+        ctx.globalAlpha = Math.sin(Math.PI * clamp(p.life / p.max, 0, 1));
+        ctx.fillRect(p.x - p.s, p.y - 0.5, p.s * 2, 1);
+        ctx.fillRect(p.x - 0.5, p.y - p.s, 1, p.s * 2);
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
   drawWater(ctx, left, right, bottom) {
     const y = this.game.waterY;
-    ctx.fillStyle = 'rgba(30,110,170,0.62)';
+    const wt = this.theme.water;
+    if (wt.gradient) {
+      const gr = ctx.createLinearGradient(0, y - 5, 0, y + 160);
+      wt.gradient.forEach((c, i) => gr.addColorStop(i / (wt.gradient.length - 1), c));
+      ctx.fillStyle = gr;
+    } else {
+      ctx.fillStyle = wt.surface;
+    }
     ctx.beginPath();
     ctx.moveTo(left, bottom + 50);
     for (let x = Math.floor(left / 10) * 10; x <= right + 10; x += 10) {
@@ -329,7 +487,7 @@ export class Renderer {
     }
     ctx.lineTo(right + 10, bottom + 50);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(220,245,255,0.7)';
+    ctx.strokeStyle = wt.foam;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let x = Math.floor(left / 10) * 10; x <= right + 10; x += 10) {
@@ -374,8 +532,15 @@ export class Renderer {
           ctx.fillRect(p.x - 1.5, p.y - 1.5, 3, 3);
           break;
         case 'drop':
-          ctx.fillStyle = `rgba(190,230,255,${Math.min(1, a * 2)})`;
-          ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+          if (p.color) {
+            ctx.globalAlpha = Math.min(1, a * 2);
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+            ctx.globalAlpha = 1;
+          } else {
+            ctx.fillStyle = `rgba(190,230,255,${Math.min(1, a * 2)})`;
+            ctx.fillRect(p.x - 1, p.y - 1, 2, 2);
+          }
           break;
         case 'spark':
           ctx.fillStyle = p.color || `rgba(255,220,100,${a})`;

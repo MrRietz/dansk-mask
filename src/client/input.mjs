@@ -35,6 +35,37 @@ export class Input {
       e.preventDefault();
       this.app.renderer.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
     }, { passive: false });
+    this.bindTouch();
+  }
+
+  // On-screen buttons (#touch in index.html). Each one stands for a key, so touch play goes through
+  // exactly the same code as the keyboard; `data-hold` buttons stay down until the finger lifts.
+  bindTouch() {
+    const press = (k, down) => this.onKey({ key: k, repeat: false, shiftKey: false, target: document.body, preventDefault() {} }, down);
+    for (const b of document.querySelectorAll('#touch button')) {
+      const k = b.dataset.key;
+      const hold = 'hold' in b.dataset;
+      b.addEventListener('contextmenu', (e) => e.preventDefault());
+      b.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        b.setPointerCapture?.(e.pointerId);
+        this.app.audio.unlock();
+        b.classList.add('held');
+        if (b.dataset.ctx === 'fuse') {
+          if (this.myTurn()) this.cmd({ type: 'fuse', n: (this.game.turn.fuse % 5) + 1 });
+        } else if (k) {
+          press(k, true);
+          if (!hold) press(k, false);
+        }
+      });
+      const up = () => {
+        if (!b.classList.contains('held')) return;
+        b.classList.remove('held');
+        if (hold && k) press(k, false);
+      };
+      b.addEventListener('pointerup', up);
+      b.addEventListener('pointercancel', up);
+    }
   }
 
   get game() {

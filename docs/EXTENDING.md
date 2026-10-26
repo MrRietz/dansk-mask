@@ -79,3 +79,24 @@ draws the weapon in the worm's hands (+x = aim direction). `registerFx(type, (e,
 * Damage numbers: bazooka 50 max at the centre is the yardstick. Super weapons are rare crate-only items.
 * Tune weapons by feel: a worm has 100 hp, a bazooka crater radius is 30 px.
 * Every weapon needs a test that fires it in a real `Game` and checks the observable effect.
+
+## Map layouts
+
+`src/core/maps.mjs` exports `LAYOUTS = [{ id, name, desc }]` and `generateTerrain(seed, w, h, waterMargin, layout)`.
+`settings.layout` (default `'islands'`, or `'random'` = picked deterministically from the seed with its own Rng) is
+resolved by `resolveLayout` and stored as `game.layout`. To add a layout: append an entry to `LAYOUTS`, write
+`function generateX(terrain, rng, w, h, waterY)` that fills/carves the mask (helpers: `fillRect`, `tunnel`,
+`terrain.fillCircle/fillLine/carveCircle`) using only the given `rng`, and register it in `GENERATORS`. Keep
+the ground above `waterY - 50` and give it at least ~24 flat, solid spots (`findSpawns` relaxes spacing and also
+tries lower surfaces); `test/maps.test.mjs` checks every layout in `LAYOUTS` automatically (spawns, determinism,
+a short AI game). Never change the `islands` generator: it keeps existing seeds stable.
+
+## Themes (visual only)
+
+A theme is a plain data block in `src/client/themes.mjs` (no game physics). To add one, append an object to
+`THEMES` with: `id`, `name`, `sky` (`stops`, `clouds` colour or `null`, `stars`, `planet` or `null`, `mountains`),
+`terrain` (`top`/`mid`/`dirt`/`rock` layers `{ c, n, b }`, `depths`, `edgeTop`, `edgeShade`), `scorch` (crater rim),
+`water` (`fill`, `surface`, `foam`, `drop`, optional `gradient`) and `ambient` (`none | snow | embers | sprinkles | glitter`;
+a new effect = a case in `Renderer.spawnAmbient/drawAmbient`, max ~110 particles). The field list is documented at the
+top of the file; `node --test test/themes.test.mjs` checks every theme has all fields and valid colours.
+`themeById(id)` falls back to meadow. The renderer takes the theme in `renderer.setGame(game, theme)`.

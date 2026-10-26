@@ -2,14 +2,14 @@
 // Input arrives only through command(); output is state plus the `events` list the client drains.
 // The same class is meant to run in a Node WebSocket server later.
 import { Rng } from './rng.mjs';
-import { generateTerrain, findSpawns } from './maps.mjs';
+import { generateTerrain, findSpawns, resolveLayout } from './maps.mjs';
 import { moveBody, stepRocket, groundStep, snapDown, unstick, launchVector } from './physics.mjs';
 import { WEAPONS, WEAPON_ORDER, startingAmmo, blast } from './weapons.mjs';
 import { OBJECT_TYPES, TURN_HOOKS } from './registry.mjs';
 import './status.mjs';
 import { AiBrain } from './ai.mjs';
 import {
-  DT, GRAVITY, WORM_R, AIM_RATE, AIM_MAX, CHARGE_TIME, WALK_SPEED, FALL_SAFE_SPEED,
+  DT, GRAVITY, WORM_R, AIM_RATE, AIM_MAX, CHARGE_TIME, WALK_SPEED, FALL_SAFE_SPEED, KNOCKBACK, KNOCK_LIFT, KNOCK_MAX,
   DEFAULT_SETTINGS, TEAM_COLORS, WORM_NAMES,
 } from './constants.mjs';
 
@@ -20,7 +20,8 @@ export class Game {
     this.cfg = { ...DEFAULT_SETTINGS, ...(config.settings || {}) };
     this.seed = config.seed ?? 1;
     this.rng = new Rng((this.seed + 7919) >>> 0);
-    const { terrain, waterY } = generateTerrain(this.seed, this.cfg.worldW, this.cfg.worldH, this.cfg.waterMargin);
+    this.layout = resolveLayout(this.cfg.layout, this.seed);
+    const { terrain, waterY } = generateTerrain(this.seed, this.cfg.worldW, this.cfg.worldH, this.cfg.waterMargin, this.layout);
     this.terrain = terrain;
     this.waterY = waterY;
     this.events = [];
@@ -42,7 +43,7 @@ export class Game {
     this.phaseTime = 0;
 
     const defs = config.teams?.length ? config.teams : [{ name: 'Player' }, { name: 'Bot', ai: true }];
-    const spawns = findSpawns(terrain, new Rng((this.seed + 101) >>> 0), defs.length * this.cfg.wormsPerTeam, waterY);
+    const spawns = findSpawns(terrain, new Rng((this.seed + 101) >>> 0), defs.length * this.cfg.wormsPerTeam, waterY, this.layout === 'islands' ? 0 : 8);
     this.rng.shuffle(spawns);
     const names = this.rng.shuffle([...WORM_NAMES]);
     defs.forEach((d, id) => {
@@ -559,8 +560,13 @@ export class Game {
       if (!b) continue;
       const nx = d > 0.001 ? dx / d : 0;
       const ny = d > 0.001 ? dy / d : -1;
-      w.vx += nx * b.push;
-      w.vy += ny * b.push - b.push * 0.3;
+      w.vx += nx * b.push * KNOCKBACK;
+      w.vy += ny * b.push * KNOCKBACK - b.push * KNOCK_LIFT;
+      const sp = Math.hypot(w.vx, w.vy);
+      if (sp > KNOCK_MAX) {
+        w.vx *= KNOCK_MAX / sp;
+        w.vy *= KNOCK_MAX / sp;
+      }
       this.knock(w);
       this.hurt(w, b.dmg, opts.owner);
     }

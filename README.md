@@ -20,6 +20,7 @@ Spelet är helt statiskt med relativa sökvägar, så det fungerar lika bra unde
 - Lag mot lag, ett lag i taget, 60 s per tur (inställbart), 3 s reträtt efter skott.
 - Vind byts varje tur. Vatten dödar. Efter runda 12 = sudden death (alla worms 1 HP, vattnet stiger).
 - Lådor droppas i fallskärm: hälsa (+25) eller vapen.
+- Sex banor (`settings.layout`, eller `random`): Floating Isles, Rolling Hills, Caverns, Canyon, Bridges, Arena — se `src/core/maps.mjs`.
 - 60 vapen i Worms Armageddons 12 grupper (F1–F12): bl.a. Bazooka, Homing Missile, Mortar, Homing Pigeon,
   Banana, Holy Hand Grenade, Dynamite, Sheep/Super Sheep, Air/Napalm/Mail/Mine strike, Mole Bomb,
   Blow Torch, Drill, Ninja Rope, Bungee, Parachute, Jet Pack, Teleport, Flame Thrower, Skunk, Mad Cow,
@@ -33,6 +34,8 @@ Kontroller (W:A): ←/→ gå, **Enter** hopp (dubbelt = bakåt), **Backspace** 
 (tryck igen för nästa i gruppen), högerklick/E vapenpanel, vänsterklick för målval (teleport, flyganfall,
 girder, homing), R/Space roterar girder, ←/→ väljer riktning på flyganfall, Tab byter mask (Select Worm),
 Home centrerar kameran, P paus, M allt ljud av, N musik av/på. B växlar studs (osäker W:A-mappning).
+
+Visuella teman (Meadow, Desert, Arctic, Volcano, Space, Candy) är rena datablock i `src/client/themes.mjs` — se `docs/EXTENDING.md`.
 
 Att lägga till fler vapen: se `docs/EXTENDING.md`. AI:n använder bazooka, granater, HHG, eldvapen (shotgun, uzi, handgun, minigun), närstrid och flyganfall (airstrike, napalm, mail, carpet, donkey) och walkers (sheep, sheeplauncher, supersheep, madcow, oldwoman, salvation, skunk) — inte verktyg.
 
