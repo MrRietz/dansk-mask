@@ -1,0 +1,14 @@
+{
+  "name": "worms-web",
+  "version": "0.1.0",
+  "description": "Worms-style artillery game in the browser (MVP: player vs AI)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node server/serve.mjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dansk Mask</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%F0%9F%AA%B1%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="weapons" class="panel hidden"></div>
+  <button id="weaponBtn" class="hidden" title="Weapon menu (right-click or E)">🎒 Weapons <kbd>E</kbd></button>
+  <div id="help" class="hidden">
+    <span><kbd>←</kbd><kbd>→</kbd> walk</span>
+    <span><kbd>Enter</kbd> jump (×2 back)</span>
+    <span><kbd>Backspace</kbd> high jump (×2 backflip)</span>
+    <span><kbd>↑</kbd><kbd>↓</kbd> aim</span>
+    <span><kbd>Space</kbd> hold &amp; release to fire</span>
+    <span><kbd>1</kbd>–<kbd>5</kbd> fuse</span>
+    <span><kbd>F1</kbd>–<kbd>F12</kbd> weapon groups</span>
+    <span><kbd>Right-click</kbd> panel</span>
+  </div>
+
+  <div id="menu" class="overlay">
+    <div class="card">
+      <h1>DANSK MASK</h1>
+      <p class="sub">Turn-based artillery. Blow up the opposing worms.</p>
+      <form id="setup">
+        <label>Your team <input name="name" value="Robin" maxlength="14"></label>
+        <label>Opponents
+          <select name="opponents"><option>1</option><option>2</option><option>3</option></select>
+        </label>
+        <label>Worms per team
+          <select name="worms"><option>1</option><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option></select>
+        </label>
+        <label>AI skill
+          <select name="level"><option value="easy">Easy</option><option value="normal" selected>Normal</option><option value="hard">Hard</option></select>
+        </label>
+        <label>Turn time
+          <select name="turn"><option>30</option><option>45</option><option selected>60</option><option>90</option></select>
+        </label>
+        <label>Map seed <input name="seed" type="number" min="1" max="999999"></label>
+        <button type="submit" class="primary">Start game</button>
+      </form>
+      <details>
+        <summary>Controls</summary>
+        <table class="keys">
+          <tr><td>← →</td><td>Walk</td></tr>
+          <tr><td>Enter</td><td>Jump forward · Enter twice: jump backward</td></tr>
+          <tr><td>Backspace</td><td>High jump · Backspace twice: backflip</td></tr>
+          <tr><td>↑ ↓</td><td>Aim (rope: shorten / lengthen)</td></tr>
+          <tr><td>Space</td><td>Hold to charge, release to fire</td></tr>
+          <tr><td>1–5</td><td>Fuse length · B: bounce</td></tr>
+          <tr><td>F1–F12</td><td>Weapon groups (press again to cycle)</td></tr>
+          <tr><td>Right-click / E</td><td>Weapon panel</td></tr>
+          <tr><td>Left-click</td><td>Target (teleport, air strike, girder, homing)</td></tr>
+          <tr><td>R / Space</td><td>Rotate girder</td></tr>
+          <tr><td>Tab</td><td>Switch worm (Select Worm)</td></tr>
+          <tr><td>Home</td><td>Centre camera on worm</td></tr>
+          <tr><td>Mouse at edge / wheel</td><td>Scroll / zoom</td></tr>
+          <tr><td>P / M</td><td>Pause / mute</td></tr>
+        </table>
+      </details>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay hidden"><div class="card"><h1>Paused</h1><p>Press P to continue</p></div></div>
+
+  <div id="over" class="overlay hidden">
+    <div class="card"><h1 id="overTitle"></h1><button id="again" class="primary">Back to menu</button></div>
+  </div>
+
+  <script type="module" src="src/client/main.mjs"></script>
+</body>
+</html>
