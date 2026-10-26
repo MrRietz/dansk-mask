@@ -1,26 +1,11 @@
 // Tiny WebAudio synth: sound effects and the music loop are generated, no asset files.
 // tone() and noise() keep their positional signatures (the draw packs call them directly);
 // the new trailing parameters (delay, filter type, destination) are optional.
+import { trackFor } from './tracks.mjs';
+
 const rnd = (a, b) => a + Math.random() * (b - a);
 const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
-
-// ---------- music: a bouncy original oom-pah march, 8 bars, C - Am - F - G twice ----------
-const BPM = 132;
-const EIGHTH = 60 / BPM / 2;
-const BASS = [48, 45, 41, 43, 48, 45, 41, 43]; // root per bar (MIDI)
-const STAB = [[60, 64, 67], [57, 60, 64], [60, 65, 69], [59, 62, 67], [60, 64, 67], [57, 60, 64], [60, 65, 69], [59, 62, 67]];
 const N = null;
-const MELODY = [ // 8 eighth notes per bar
-  [76, N, 79, 76, 72, N, 74, 76],
-  [81, N, 76, 72, 76, N, 74, 72],
-  [77, N, 81, 77, 72, N, 74, 77],
-  [79, N, 74, 71, 74, N, 79, N],
-  [76, 76, 79, N, 84, N, 79, 76],
-  [81, N, 79, 76, 72, N, 76, N],
-  [77, N, 76, 74, 72, N, 74, N],
-  [74, N, 71, 74, 79, N, N, N],
-];
-const LOOP_STEPS = MELODY.length * 8;
 
 export class Audio {
   constructor() {
@@ -33,6 +18,7 @@ export class Audio {
     this.step = 0;
     this.loops = 0;
     this.nextT = 0;
+    this.track = trackFor();
   }
 
   unlock() {
@@ -212,37 +198,88 @@ export class Audio {
     if (this.music) this.music.gain.value = on ? 0 : 0.3;
   }
 
+  // Each map has its own tune (tracks.mjs). Switching restarts the loop from the top.
+  setTrack(layoutId) {
+    const t = trackFor(layoutId);
+    if (t === this.track) return;
+    this.track = t;
+    this.step = 0;
+    this.loops = 0;
+    this.nextT = this.ctx ? this.ctx.currentTime + 0.1 : 0;
+  }
+
   schedule() {
     const c = this.ctx;
     if (!c || c.state !== 'running') return;
     if (this.nextT < c.currentTime) this.nextT = c.currentTime + 0.05; // fell behind (tab was hidden)
     while (this.nextT < c.currentTime + 0.4) {
-      this.playStep(this.step, this.nextT - c.currentTime);
-      this.step = (this.step + 1) % LOOP_STEPS;
+      const t = this.track;
+      this.playStep(t, this.step, this.nextT - c.currentTime);
+      this.step = (this.step + 1) % (t.mel.length * 8);
       if (this.step === 0) this.loops++;
-      this.nextT += EIGHTH;
+      this.nextT += 60 / t.bpm / 2;
     }
   }
 
-  playStep(step, at) {
+  playStep(t, step, at) {
     const bar = step >> 3;
     const e = step & 7;
     const m = this.music;
-    const alt = this.loops % 2 === 1; // every second pass the lead changes voice and drops an octave
-    if (e === 0 || e === 4) {
-      this.tone(hz(BASS[bar] + (e === 4 ? 7 : 0)), EIGHTH * 1.6, 'triangle', 0.4, 0, at, m);
-      this.tone(110, 0.1, 'sine', 0.35, -80, at, m); // kick
+    const E = 60 / t.bpm / 2; // one eighth note
+    const root = t.roots[bar];
+
+    // bass
+    const off = t.bass.pat[e];
+    if (off !== N) {
+      const f = hz(root + off);
+      if (t.bass.kind === 'tri') this.tone(f, E * 1.6, 'triangle', t.bass.vol, 0, at, m);
+      else if (t.bass.kind === 'saw') {
+        this.tone(f, E * 0.9, 'sawtooth', t.bass.vol, 0, at, m);
+        this.tone(f / 2, E * 0.9, 'sine', t.bass.vol * 0.8, 0, at, m);
+      } else this.tone(f, E * 7, 'sine', t.bass.vol, 0, at, m); // pad: rings for the whole bar
     }
-    if (e === 2 || e === 6) {
-      for (const n of STAB[bar]) this.tone(hz(n), EIGHTH * 0.8, 'square', 0.035, 0, at, m);
-      this.noise(0.08, 0.1, 4000, 2000, at, 'highpass', m); // snare
+
+    // chords
+    if (t.chord && t.chord.pat[e]) {
+      const ch = t.chords[bar];
+      if (t.chord.kind === 'square') for (const n of ch) this.tone(hz(n), E * 0.8, 'square', 0.035, 0, at, m);
+      else if (t.chord.kind === 'power') for (const n of ch) this.tone(hz(n), E * 0.85, 'square', 0.04, 0, at, m);
+      else for (const n of ch) this.tone(hz(n), E * 7, 'triangle', 0.045, 0, at, m); // soft pad
     }
-    if (e & 1) this.noise(0.03, 0.06, 9000, 9000, at, 'highpass', m); // hat
-    const note = MELODY[bar][e];
-    if (note !== null) {
-      if (alt) this.wobble(hz(note - 12), EIGHTH * 1.7, 'triangle', 0.22, 6, 3, at, 0, m);
-      else this.tone(hz(note), EIGHTH * 1.4, 'square', 0.08, 0, at, m);
+
+    // drums
+    const d = t.drums;
+    if (d.kick[e]) this.tone(110, 0.1, 'sine', d.kickVol, -80, at, m);
+    if (d.snare[e]) {
+      if (d.snareKind === 'tak') this.noise(0.05, 0.14, 3500, 2500, at, 'bandpass', m);
+      else if (d.snareKind === 'clap') this.noise(0.09, 0.08, 2500, 1500, at, 'bandpass', m);
+      else this.noise(0.08, 0.1, 4000, 2000, at, 'highpass', m);
     }
-    if (bar === 7 && e >= 4) this.noise(0.05, 0.1, 5000, 5000, at, 'highpass', m); // fill into the loop
+    if (d.hat[e]) {
+      if (d.hatKind === 'bells') {
+        this.noise(0.05, 0.05, 7000, 7000, at, 'highpass', m);
+        this.tone(hz(96 + (e % 4)), 0.08, 'sine', 0.012, 0, at, m);
+      } else this.noise(0.03, d.hat.every(Boolean) ? 0.045 : 0.06, 9000, 9000, at, 'highpass', m);
+    }
+    if (t.fill && bar === t.mel.length - 1 && e >= 4) this.noise(0.05, 0.1, 5000, 5000, at, 'highpass', m);
+
+    // lead
+    const note = t.mel[bar][e];
+    if (note === N) return;
+    const alt = t.alt && this.loops % 2 === 1; // every second pass the lead changes voice and drops an octave
+    const f = hz(note);
+    if (alt) this.wobble(hz(note - 12), E * 1.7, 'triangle', 0.22, 6, 3, at, 0, m);
+    else if (t.lead === 'square') this.tone(f, E * 1.4, 'square', 0.08, 0, at, m);
+    else if (t.lead === 'pungi') this.wobble(f, E * 1.8, 'sawtooth', 0.1, 5.5, f * 0.006, at, 1500, m);
+    else if (t.lead === 'bell') {
+      this.tone(f, E * 5, 'sine', 0.14, 0, at, m);
+      this.tone(f * 2.76, E * 2.5, 'sine', 0.035, 0, at, m);
+    } else if (t.lead === 'music') {
+      this.tone(f, E * 0.9, 'triangle', 0.12, 0, at, m);
+      this.tone(f * 2, E * 0.6, 'sine', 0.05, 0, at, m);
+    } else {
+      this.tone(f, E * 4, 'triangle', 0.1, 0, at, m); // glass
+      this.tone(f * 2.005, E * 3, 'sine', 0.03, 0, at, m);
+    }
   }
 }

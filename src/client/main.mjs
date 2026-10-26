@@ -107,6 +107,7 @@ function startGame(form) {
   $('menu').classList.add('hidden');
   $('over').classList.add('hidden');
   audio.pause(false);
+  audio.setTrack(app.game.layout); // every map has its own music ('random' was resolved by the game)
   audio.wantMusic = true;
   audio.unlock();
   audio.startMusic();

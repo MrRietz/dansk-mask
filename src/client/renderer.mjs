@@ -12,6 +12,11 @@ const SPRINKLES = ['#ff5fa2', '#ffd23f', '#5fe3c0', '#6fa8ff', '#ffffff', '#b78c
 const rand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+// Shots the camera follows while they fly or walk: rockets, grenades, sheep (all kinds), cows and other
+// walkers (wk_*), the projectile pack (pj_*), arrows, dragon balls and armed mines.
+const followed = (o) => o.kind === 'rocket' || o.kind === 'grenade' || o.kind === 'sheep' || o.kind === 'arrow' || o.kind === 'dragonball'
+  || o.kind.startsWith('wk_') || o.kind.startsWith('pj_') || (o.kind === 'mine' && o.trig);
+
 export class Renderer {
   constructor(canvas, audio) {
     this.canvas = canvas;
@@ -234,7 +239,7 @@ export class Renderer {
       let target = null;
       for (let i = g.objects.length - 1; i >= 0; i--) {
         const o = g.objects[i];
-        if (o.kind === 'rocket' || o.kind === 'grenade' || o.kind === 'sheep' || (o.kind === 'mine' && o.trig)) {
+        if (!o.dead && followed(o)) {
           target = o;
           break;
         }
