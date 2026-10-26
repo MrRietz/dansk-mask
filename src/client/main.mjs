@@ -5,7 +5,8 @@ import { Renderer } from './renderer.mjs';
 import { Input } from './input.mjs';
 import { Audio } from './audio.mjs';
 import { LAYOUTS } from '../core/maps.mjs';
-import { THEMES, themeById } from './themes.mjs';
+import { themeForLayout } from './themes.mjs';
+import { PW, PH, drawLayoutPreview } from './preview.mjs';
 
 const $ = (id) => document.getElementById(id);
 const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
@@ -13,6 +14,7 @@ document.body.classList.toggle('touch', isTouch);
 const canvas = $('game');
 const audio = new Audio();
 const renderer = new Renderer(canvas, audio);
+renderer.touch = isTouch; // only changes the wording of hints; the HUD is the same everywhere
 
 const app = {
   game: null,
@@ -56,7 +58,7 @@ function buildWeaponMenu() {
   }
   const info = document.createElement('div');
   info.className = 'info';
-  info.textContent = 'Right-click or E to close';
+  info.textContent = isTouch ? 'Tap the map to close' : 'Right-click or E to close';
   info.style.gridArea = '8 / 1 / 9 / 13';
   panel.appendChild(info);
   for (const id of WEAPON_ORDER) {
@@ -93,8 +95,7 @@ function startGame(form) {
   });
   app.humanTeam = 0;
   app.paused = false;
-  const themeId = String(f.get('theme'));
-  const theme = themeById(themeId === 'random' ? THEMES[Math.floor(Math.random() * THEMES.length)].id : themeId);
+  const theme = themeForLayout(app.game.layout); // 'random' has already been resolved by the game
   renderer.setGame(app.game, theme);
   if (isTouch) {
     $('touch').classList.remove('hidden');
@@ -116,9 +117,62 @@ $('setup').addEventListener('submit', (e) => {
   startGame(e.target);
 });
 $('setup').elements.seed.value = Math.floor(Math.random() * 999999) + 1;
-for (const [name, list] of [['layout', LAYOUTS], ['theme', THEMES]]) {
-  for (const o of list) $('setup').elements[name].add(new Option(o.name, o.id));
+// Map picker: picture cards. The previews come from the real generator (same seed and layout), painted in
+// the map's own theme, so what you see is the map you get. Every map has its own theme (themeForLayout).
+const setup = $('setup');
+const mapCards = [{ id: 'random', name: 'Random', desc: 'A random map' }, ...LAYOUTS].map((o) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'pcard';
+  b.title = o.desc || o.name;
+  b.setAttribute('role', 'radio');
+  if (o.id === 'random') {
+    b.insertAdjacentHTML('beforeend', '<div class="dice">🎲</div>');
+  } else {
+    const c = document.createElement('canvas');
+    [c.width, c.height] = [PW, PH];
+    b.append(c);
+  }
+  b.insertAdjacentHTML('beforeend', `<span>${o.name}</span>`);
+  b.addEventListener('click', () => {
+    setup.elements.layout.value = o.id;
+    markPickers();
+  });
+  $('layoutPick').append(b);
+  return { o, b };
+});
+
+function markPickers() {
+  const cur = setup.elements.layout.value;
+  for (const { o, b } of mapCards) {
+    b.classList.toggle('sel', o.id === cur);
+    b.setAttribute('aria-checked', String(o.id === cur));
+  }
+  $('layoutName').textContent = (mapCards.find(({ o }) => o.id === cur) || mapCards[0]).o.name;
 }
+
+// Generating six full maps takes a moment, so it is spread over a few timer ticks.
+let previewJob = 0;
+function renderPreviews() {
+  const job = ++previewJob;
+  const seed = Number(setup.elements.seed.value) || 1;
+  const ids = LAYOUTS.map((l) => l.id);
+  const next = () => {
+    if (job !== previewJob || !ids.length) return;
+    const id = ids.shift();
+    const card = mapCards.find(({ o }) => o.id === id);
+    drawLayoutPreview(card.b.querySelector('canvas'), id, seed, themeForLayout(id));
+    setTimeout(next, 0);
+  };
+  next();
+}
+let seedTimer = 0;
+setup.elements.seed.addEventListener('input', () => {
+  clearTimeout(seedTimer);
+  seedTimer = setTimeout(renderPreviews, 300);
+});
+markPickers();
+setTimeout(renderPreviews, 0);
 $('pause').addEventListener('click', () => app.togglePause()); // the overlay covers the touch buttons
 $('weaponBtn').addEventListener('click', (e) => {
   e.currentTarget.blur();

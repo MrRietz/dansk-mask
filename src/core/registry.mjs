@@ -26,6 +26,7 @@ export function registerWeapons(defs) {
 // Custom object kinds (projectiles, walkers, strikes ...):
 //   update(game, obj)     per tick; set obj.dead = true to remove
 //   passive(obj) -> true  when the object does not hold up the end of the turn (idle mine, grave)
+//   steerable: true       the owner's arrow keys steer this object; while one is alive the worm itself ignores them
 //   draw(ctx, obj, r)     client drawing (registered separately via registerDrawer in the client)
 export const OBJECT_TYPES = {};
 export function registerObjectType(kind, def) {

@@ -162,3 +162,17 @@ export const THEMES = [
 export function themeById(id) {
   return THEMES.find((t) => t.id === id) || THEMES[0];
 }
+
+// Every map has its own theme: the look is part of the map, not a separate choice.
+export const LAYOUT_THEME = {
+  islands: 'meadow',
+  hills: 'desert',
+  caverns: 'volcano',
+  canyon: 'space',
+  bridges: 'candy',
+  arena: 'arctic',
+};
+
+export function themeForLayout(layoutId) {
+  return themeById(LAYOUT_THEME[layoutId]);
+}

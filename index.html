@@ -69,18 +69,29 @@
         <label>Turn time
           <select name="turn"><option>30</option><option>45</option><option selected>60</option><option>90</option></select>
         </label>
-        <label>Map
-          <select name="layout"><option value="random">Random</option></select>
-        </label>
-        <label>Theme
-          <select name="theme"><option value="random">Random</option></select>
-        </label>
         <label>Map seed <input name="seed" type="number" min="1" max="999999"></label>
+        <div class="field">
+          <span>Map <small id="layoutName">Random</small></span>
+          <input type="hidden" name="layout" value="random">
+          <div id="layoutPick" class="pick" role="radiogroup" aria-label="Map"></div>
+        </div>
         <button type="submit" class="primary">Start game</button>
       </form>
       <details>
         <summary>Controls</summary>
-        <table class="keys">
+        <table class="keys touch-only">
+          <tr><td>◀ ▶</td><td>Walk</td></tr>
+          <tr><td>▲ ▼</td><td>Aim (rope: shorten / lengthen)</td></tr>
+          <tr><td>⤴</td><td>Jump · tap twice: jump backward</td></tr>
+          <tr><td>⤒</td><td>High jump · tap twice: backflip</td></tr>
+          <tr><td>FIRE</td><td>Hold to charge, release to fire</td></tr>
+          <tr><td>🎒 Weapons</td><td>Weapon panel</td></tr>
+          <tr><td>Tap the map</td><td>Target (teleport, air strike, girder, homing)</td></tr>
+          <tr><td>⏱ ⟳ ↯ 🔀</td><td>Fuse length, rotate girder, bounce, switch worm (appear when the weapon uses them)</td></tr>
+          <tr><td>Drag / pinch</td><td>Scroll / zoom the map</td></tr>
+          <tr><td>⏸ 🔊 🎵</td><td>Pause / mute all / music on-off</td></tr>
+        </table>
+        <table class="keys pc-only">
           <tr><td>← →</td><td>Walk</td></tr>
           <tr><td>Enter</td><td>Jump forward · Enter twice: jump backward</td></tr>
           <tr><td>Backspace</td><td>High jump · Backspace twice: backflip</td></tr>
@@ -95,13 +106,12 @@
           <tr><td>Home</td><td>Centre camera on worm</td></tr>
           <tr><td>Mouse at edge / wheel</td><td>Scroll / zoom</td></tr>
           <tr><td>P / M / N</td><td>Pause / mute all / music on-off</td></tr>
-          <tr><td>Touch</td><td>On-screen buttons: ◀ ▶ walk, ▲ ▼ aim, ⤴ jump, ⤒ high jump, hold FIRE then release</td></tr>
         </table>
       </details>
     </div>
   </div>
 
-  <div id="pause" class="overlay hidden"><div class="card"><h1>Paused</h1><p>Press P (or ⏸) to continue</p></div></div>
+  <div id="pause" class="overlay hidden"><div class="card"><h1>Paused</h1><p><span class="pc-only">Press P to continue</span><span class="touch-only">Tap to continue</span></p></div></div>
 
   <div id="over" class="overlay hidden">
     <div class="card"><h1 id="overTitle"></h1><button id="again" class="primary">Back to menu</button></div>

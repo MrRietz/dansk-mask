@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { THEMES, themeById } from '../src/client/themes.mjs';
+import { THEMES, themeById, themeForLayout, LAYOUT_THEME } from '../src/client/themes.mjs';
+import { LAYOUTS } from '../src/core/maps.mjs';
 
 const COLOR = /^(#[0-9a-f]{3,8}|rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*[\d.]+\s*)?\)|hsla?\([\d\s.,%]+\))$/i;
 const isColor = (s) => typeof s === 'string' && COLOR.test(s);
@@ -61,4 +62,14 @@ test('themeById falls back to meadow', () => {
   assert.equal(themeById('desert').id, 'desert');
   assert.equal(themeById('nope').id, 'meadow');
   assert.equal(themeById(undefined).id, 'meadow');
+});
+
+test('every map has its own theme, and each theme belongs to exactly one map', () => {
+  for (const l of LAYOUTS) {
+    assert.ok(LAYOUT_THEME[l.id], `no theme for map ${l.id}`);
+    assert.equal(themeForLayout(l.id).id, LAYOUT_THEME[l.id], l.id);
+  }
+  const used = LAYOUTS.map((l) => LAYOUT_THEME[l.id]);
+  assert.equal(new Set(used).size, LAYOUTS.length, 'no two maps share a theme');
+  for (const id of used) assert.ok(THEMES.some((t) => t.id === id), `unknown theme ${id}`);
 });

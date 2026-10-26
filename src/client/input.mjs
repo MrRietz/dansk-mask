@@ -36,6 +36,49 @@ export class Input {
       this.app.renderer.zoomBy(e.deltaY < 0 ? 1.1 : 1 / 1.1);
     }, { passive: false });
     this.bindTouch();
+    this.bindTouchCamera(canvas);
+  }
+
+  // Touch camera: drag with one finger to scroll the map, pinch with two to zoom, tap to target.
+  // The pointerdown is cancelled so the browser sends no emulated mouse events; the tap is handled here.
+  bindTouchCamera(canvas) {
+    const fingers = new Map();
+    canvas.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'touch') return;
+      e.preventDefault();
+      this.app.audio.unlock();
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* not an active pointer: fine */ }
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: false });
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const f = fingers.get(e.pointerId);
+      if (!f) return;
+      const dx = e.clientX - f.x;
+      const dy = e.clientY - f.y;
+      if (fingers.size >= 2) {
+        const [a, b] = [...fingers.values()];
+        const before = Math.hypot(a.x - b.x, a.y - b.y);
+        f.x = e.clientX;
+        f.y = e.clientY;
+        const after = Math.hypot(a.x - b.x, a.y - b.y);
+        if (before > 10) this.app.renderer.zoomBy(after / before);
+        for (const o of fingers.values()) o.moved = true; // a pinch is never a tap
+        return;
+      }
+      f.x = e.clientX;
+      f.y = e.clientY;
+      if (!f.moved && Math.hypot(e.clientX - f.x0, e.clientY - f.y0) < 10) return; // small wobble is still a tap
+      f.moved = true;
+      this.app.renderer.panBy(dx, dy);
+    });
+    const end = (e) => {
+      const f = fingers.get(e.pointerId);
+      if (!f) return;
+      fingers.delete(e.pointerId);
+      if (e.type === 'pointerup' && !f.moved) this.onClick({ clientX: e.clientX, clientY: e.clientY, button: 0 });
+    };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
   }
 
   // On-screen buttons (#touch in index.html). Each one stands for a key, so touch play goes through

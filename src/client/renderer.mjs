@@ -204,6 +204,13 @@ export class Renderer {
     this.focus = { x, y: (s > 0 ? s : g.activeWorm().y) - 80, until: this.t + 4.5 };
   }
 
+  // Dragging the map (touch): dx/dy are screen pixels. The camera stays where it was put for a few seconds.
+  panBy(dx, dy) {
+    this.cam.x -= dx / this.cam.zoom;
+    this.cam.y -= dy / this.cam.zoom;
+    this.manualUntil = this.t + 4;
+  }
+
   updateCamera(dt, mouse) {
     const g = this.game;
     const cam = this.cam;
@@ -1106,7 +1113,8 @@ export class Renderer {
       if (g.teams[t.team].ai === false && !t.fired) {
         ctx.font = '11px sans-serif';
         ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        const hint = wd.target ? 'Click to use' : wd.charge ? 'Hold SPACE to charge, release to fire' : wd.rope ? 'SPACE to shoot rope' : wd.placed || wd.hitscan || wd.melee ? 'SPACE to use' : '';
+        const fire = this.touch ? 'FIRE' : 'SPACE';
+        const hint = wd.target ? (this.touch ? 'Tap the map to use' : 'Click to use') : wd.charge ? `Hold ${fire} to charge, release to fire` : wd.rope ? `${fire} to shoot rope` : wd.placed || wd.hitscan || wd.melee ? `${fire} to use` : '';
         ctx.fillText(hint, vw / 2, vh - 56);
       }
     }

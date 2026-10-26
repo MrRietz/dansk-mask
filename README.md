@@ -35,7 +35,9 @@ Kontroller (W:A): ←/→ gå, **Enter** hopp (dubbelt = bakåt), **Backspace** 
 girder, homing), R/Space roterar girder, ←/→ väljer riktning på flyganfall, Tab byter mask (Select Worm),
 Home centrerar kameran, P paus, M allt ljud av, N musik av/på. B växlar studs (osäker W:A-mappning).
 
-Visuella teman (Meadow, Desert, Arctic, Volcano, Space, Candy) är rena datablock i `src/client/themes.mjs` — se `docs/EXTENDING.md`.
+Varje bana har sitt eget visuella tema (Floating Isles = Meadow, Rolling Hills = Desert, Caverns = Volcano, Canyon = Space,
+Bridges = Candy, Arena = Arctic). Man väljer bara bana i startmenyn, med bildförhandsvisning gjord av den riktiga
+bangeneratorn. Teman är rena datablock i `src/client/themes.mjs` — se `docs/EXTENDING.md`.
 
 Att lägga till fler vapen: se `docs/EXTENDING.md`. AI:n använder bazooka, granater, HHG, eldvapen (shotgun, uzi, handgun, minigun), närstrid och flyganfall (airstrike, napalm, mail, carpet, donkey) och walkers (sheep, sheeplauncher, supersheep, madcow, oldwoman, salvation, skunk) — inte verktyg.
 

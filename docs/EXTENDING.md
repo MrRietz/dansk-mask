@@ -100,3 +100,5 @@ A theme is a plain data block in `src/client/themes.mjs` (no game physics). To a
 a new effect = a case in `Renderer.spawnAmbient/drawAmbient`, max ~110 particles). The field list is documented at the
 top of the file; `node --test test/themes.test.mjs` checks every theme has all fields and valid colours.
 `themeById(id)` falls back to meadow. The renderer takes the theme in `renderer.setGame(game, theme)`.
+A theme belongs to a map: `LAYOUT_THEME` in the same file maps every layout id (from `LAYOUTS` in `maps.mjs`) to a theme id,
+and `themeForLayout(id)` is what the menu previews and the game use. A new layout needs an entry there.

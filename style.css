@@ -61,3 +61,18 @@ kbd { display: inline-block; background: #22344f; border: 1px solid #4a6791; bor
   .card { padding: 16px 18px; }
   .card h1 { font-size: 30px; letter-spacing: 3px; }
 }
+
+/* Menu pickers: maps and themes as picture cards. */
+#menu .card { max-width: 560px; }
+.field { display: grid; gap: 6px; font-size: 15px; }
+.field small { color: var(--accent); margin-left: 6px; font-weight: 600; }
+.pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.pcard { display: grid; gap: 4px; padding: 4px; background: #0f1b2d; border: 2px solid #35507a; border-radius: 8px; font-size: 11px; line-height: 1.2; color: var(--text); text-align: center; }
+.pcard:hover { background: #1a2c48; }
+.pcard canvas { width: 100%; height: auto; aspect-ratio: 150 / 60; border-radius: 4px; display: block; }
+.pcard .dice { display: grid; place-items: center; aspect-ratio: 150 / 60; font-size: 26px; border-radius: 4px; background: repeating-linear-gradient(45deg, #16253d, #16253d 6px, #1a2c48 6px, #1a2c48 12px); }
+.pcard.sel { border-color: var(--accent); background: #1d2f4a; box-shadow: 0 0 0 1px var(--accent); }
+
+/* Keyboard/mouse hints are hidden on touch devices, touch hints on desktop. */
+.touch .pc-only { display: none !important; }
+body:not(.touch) .touch-only { display: none !important; }

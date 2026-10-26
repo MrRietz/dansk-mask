@@ -97,6 +97,7 @@ registerObjectType('wk_sheep', {
 
 // Flies at constant speed; the arrow keys of the owner's turn rotate the heading towards the pressed direction.
 registerObjectType('wk_supersheep', {
+  steerable: true,
   update(g, o) {
     o.age += DT;
     o.fuse -= DT;

@@ -815,7 +815,9 @@ export class Game {
       this.beginResolve();
       return;
     }
-    const inp = t.input;
+    // While a steerable shot (Super Sheep ...) is in the air the arrow keys steer it, not the worm.
+    const steering = this.objects.some((o) => !o.dead && OBJECT_TYPES[o.kind]?.steerable && this.worms[o.owner]?.team === t.team);
+    const inp = steering ? { l: 0, r: 0, u: 0, d: 0 } : t.input;
     w.turnCd = Math.max(0, w.turnCd - DT);
     t.cool = Math.max(0, t.cool - DT);
     w.walking = false;
